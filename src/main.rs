@@ -49,18 +49,15 @@ fn find_next_char(client: &Client, current_flag: &str) -> Option<char> {
             .body(format!("search={}", payload))
             .send();
 
-        match res {
-            Ok(response) => {
-                let body = response.text().unwrap_or_default();
+        if let Ok(response) = res {
+            let body = response.text().unwrap_or_default();
 
-                if body.contains("<td>") {
-                    return Some(c as char);
-                }
+            if body.contains("<td>") {
+                return Some(c as char);
             }
-            Err(e) => {
-                eprintln!("Error sending request: {}", e);
-                return None;
-            }
+        } else {
+            eprintln!("Error sending request: {}", res.unwrap_err());
+            return None;
         }
     }
 
